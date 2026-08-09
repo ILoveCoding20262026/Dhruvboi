@@ -32,6 +32,14 @@ export default function TrialScreen() {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
   }, [messages, isThinking]);
 
+  useEffect(() => {
+    const onEsc = (e) => {
+      if (e.key === "Escape") { setEvOpen(false); setOptOpen(false); }
+    };
+    window.addEventListener("keydown", onEsc);
+    return () => window.removeEventListener("keydown", onEsc);
+  }, []);
+
   const submit = () => {
     const msg = input.trim();
     if (!msg || isThinking) return;
