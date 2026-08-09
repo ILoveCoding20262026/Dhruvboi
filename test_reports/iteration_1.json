@@ -1,0 +1,30 @@
+{
+  "summary": "Full-stack testing of Delhi Sultanate Court app: 16 backend pytest cases (auth, trial/turn LLM proxy, balance formula, evidence system, save/load, complete+stats) — all 16 PASSED after correcting one test bug (email lowercased server-side). Frontend Playwright covers Auth -> Cover -> Rules -> ChooseSultan -> Cinematic -> Trial -> Speak -> LLM turn -> Options/Evidence modals -> Continue Trial resume. All critical flows PASSED. Balance formula verified (waytooasy good×5.0/bad×0.2, medium 1.0/1.0, impossible 0.2/5.0). Evidence gating on even rounds confirmed. Exploit-proof presentation confirmed (works only with granted evidence + present keyword). Auto-save + Continue Trial resumes at correct round.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "TrialScreen evidence-modal", "issues": ["Escape key does not close the evidence modal; only the CLOSE button works. Minor UX polish — consider adding onKeyDown handler."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_court_backend.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is ~475 lines; still manageable but approaching split threshold — auth, LLM, trial, save/stats routes could be moved into modules under /app/backend/routers/ for future growth.",
+    "sultan_speech LLM call is awaited sequentially AFTER the 3-way asyncio.gather; consider adding it to the gather when it does not depend on the JSON mood (currently it does, so ordering is correct — acceptable).",
+    "compute_suspicion multipliers are correct verbatim ports; goodWeight=farukhMult/qaziMult, badWeight=qaziMult/farukhMult confirmed against test cases.",
+    "Frontend evidence modal lacks Escape-to-close; minor."
+  ],
+  "updated_files": ["/app/backend/tests/test_court_backend.py"],
+  "success_rate": {"backend": "100% (16/16)", "frontend": "100% (all critical flows)"},
+  "test_credentials": "farrukh@test.com / vault123 (existing, JWT works)",
+  "seed_data_creation": "No new seed. Created ephemeral TEST_ users during register test and a completed match record in stats test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend tests live at /app/backend/tests/test_court_backend.py — a single pytest file with 6 classes covering all endpoints. Uses REACT_APP_BACKEND_URL env var. Trial-turn tests hit real Claude (10-25s each). Save/Load test cleans its own state. Frontend testids all present per review request; testable via Playwright without issue.",
+  "rca of the issue": "N/A — no defects found. First iteration is solid."
+}

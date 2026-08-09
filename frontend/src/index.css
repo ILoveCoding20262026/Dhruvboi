@@ -1,115 +1,71 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&display=swap');
+@import './game/court.css';
 
-body {
-    margin: 0;
-    font-family:
-        -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
-        "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
-        sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+/* App-specific additions layered on top of the verbatim court.css */
+.screen { position: fixed; }
+
+/* Auth screen */
+.auth-screen {
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse 70% 60% at 50% 40%, #1c0e04, var(--dark));
+  padding: 24px; overflow-y: auto;
 }
-
-code {
-    font-family:
-        source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+.auth-card {
+  width: 100%; max-width: 420px; background: rgba(10,7,4,.72); backdrop-filter: blur(16px);
+  border: 1px solid var(--border); border-radius: 8px; padding: 40px 34px;
+  box-shadow: 0 24px 60px rgba(0,0,0,.6);
 }
+.auth-title { font-family: 'Cinzel Decorative', serif; font-size: 30px; font-weight: 900; color: var(--gold-b);
+  letter-spacing: 3px; text-align: center; line-height: 1.15; text-shadow: 0 0 30px #ffd70044; }
+.auth-sub { font-family: 'Cinzel', serif; font-size: 11px; color: var(--dim); letter-spacing: 5px;
+  text-align: center; margin: 8px 0 30px; }
+.auth-field { margin-bottom: 20px; }
+.auth-label { display: block; font-family: 'Cinzel', serif; font-size: 10px; letter-spacing: 2px;
+  color: var(--gold); text-transform: uppercase; margin-bottom: 7px; }
+.auth-input { width: 100%; background: transparent; border: none; border-bottom: 1px solid #3e2e18;
+  color: var(--ivory); font-family: 'IM Fell English', serif; font-size: 16px; padding: 8px 2px;
+  outline: none; transition: border-color .3s; }
+.auth-input:focus { border-color: var(--gold); }
+.auth-input::placeholder { color: #3e2e18; }
+.auth-btn { width: 100%; font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; color: var(--ink);
+  background: linear-gradient(135deg, #ffd700, #c9a84c, #ffd700); background-size: 200%; border: none;
+  padding: 14px; border-radius: 3px; cursor: pointer; letter-spacing: 3px; margin-top: 8px;
+  transition: transform .2s, box-shadow .2s; }
+.auth-btn:hover:not(:disabled) { transform: scale(1.02); box-shadow: 0 0 24px #ffd70066; }
+.auth-btn:disabled { opacity: .5; cursor: default; }
+.auth-google { width: 100%; font-family: 'Cinzel', serif; font-size: 12px; color: var(--ivory);
+  background: rgba(255,255,255,.05); border: 1px solid #3e2e18; padding: 12px; border-radius: 3px;
+  cursor: pointer; letter-spacing: 2px; margin-top: 14px; display: flex; align-items: center;
+  justify-content: center; gap: 10px; transition: all .25s; }
+.auth-google:hover { border-color: var(--gold); background: rgba(255,255,255,.08); }
+.auth-switch { text-align: center; margin-top: 22px; font-size: 13px; color: var(--dim); }
+.auth-switch button { background: none; border: none; color: var(--gold); cursor: pointer;
+  font-family: 'IM Fell English', serif; font-size: 13px; text-decoration: underline; }
+.auth-error { color: var(--red); font-size: 13px; text-align: center; margin-bottom: 16px; font-style: italic; }
+.auth-divider { display: flex; align-items: center; gap: 12px; margin: 22px 0 4px; }
+.auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: #2e1e08; }
+.auth-divider span { font-family: 'Cinzel', serif; font-size: 9px; letter-spacing: 3px; color: #5a4030; }
 
-@layer base {
-    :root {
-        --background: 0 0% 100%;
-        --foreground: 0 0% 3.9%;
-        --card: 0 0% 100%;
-        --card-foreground: 0 0% 3.9%;
-        --popover: 0 0% 100%;
-        --popover-foreground: 0 0% 3.9%;
-        --primary: 0 0% 9%;
-        --primary-foreground: 0 0% 98%;
-        --secondary: 0 0% 96.1%;
-        --secondary-foreground: 0 0% 9%;
-        --muted: 0 0% 96.1%;
-        --muted-foreground: 0 0% 45.1%;
-        --accent: 0 0% 96.1%;
-        --accent-foreground: 0 0% 9%;
-        --destructive: 0 84.2% 60.2%;
-        --destructive-foreground: 0 0% 98%;
-        --border: 0 0% 89.8%;
-        --input: 0 0% 89.8%;
-        --ring: 0 0% 3.9%;
-        --chart-1: 12 76% 61%;
-        --chart-2: 173 58% 39%;
-        --chart-3: 197 37% 24%;
-        --chart-4: 43 74% 66%;
-        --chart-5: 27 87% 67%;
-        --radius: 0.5rem;
-    }
-    .dark {
-        --background: 0 0% 3.9%;
-        --foreground: 0 0% 98%;
-        --card: 0 0% 3.9%;
-        --card-foreground: 0 0% 98%;
-        --popover: 0 0% 3.9%;
-        --popover-foreground: 0 0% 98%;
-        --primary: 0 0% 98%;
-        --primary-foreground: 0 0% 9%;
-        --secondary: 0 0% 14.9%;
-        --secondary-foreground: 0 0% 98%;
-        --muted: 0 0% 14.9%;
-        --muted-foreground: 0 0% 63.9%;
-        --accent: 0 0% 14.9%;
-        --accent-foreground: 0 0% 98%;
-        --destructive: 0 62.8% 30.6%;
-        --destructive-foreground: 0 0% 98%;
-        --border: 0 0% 14.9%;
-        --input: 0 0% 14.9%;
-        --ring: 0 0% 83.1%;
-        --chart-1: 220 70% 50%;
-        --chart-2: 160 60% 45%;
-        --chart-3: 30 80% 55%;
-        --chart-4: 280 65% 60%;
-        --chart-5: 340 75% 55%;
-    }
-}
+/* Cover nav + top-right account chip */
+.cover-nav { display: flex; flex-direction: column; gap: 14px; margin-top: 8px; align-items: center; }
+.cover-nav-btn { font-family: 'Cinzel', serif; font-size: 14px; letter-spacing: 4px; color: var(--gold);
+  background: transparent; border: 1px solid #2e1e08; padding: 13px 34px; border-radius: 2px;
+  cursor: pointer; transition: all .25s; min-width: 280px; }
+.cover-nav-btn:hover { border-color: var(--gold); background: #1a1208; box-shadow: 0 0 16px #c9a84c22; transform: translateY(-1px); }
+.cover-nav-btn.primary { color: var(--ink); background: linear-gradient(135deg,#ffd700,#c9a84c,#ffd700);
+  background-size: 200%; border: none; font-weight: 700; animation: shimmer 3s linear infinite; }
+.cover-nav-btn.disabled { opacity: .4; cursor: default; }
+.account-chip { position: fixed; top: 16px; right: 18px; z-index: 60; display: flex; align-items: center; gap: 12px;
+  font-family: 'Cinzel', serif; font-size: 11px; color: var(--dim); letter-spacing: 2px; }
+.account-chip button { background: none; border: 1px solid #2e1e08; color: var(--gold); font-family: 'Cinzel', serif;
+  font-size: 10px; letter-spacing: 2px; padding: 5px 12px; border-radius: 2px; cursor: pointer; transition: all .2s; }
+.account-chip button:hover { border-color: var(--gold); }
 
-@layer base {
-    * {
-        @apply border-border;
-    }
-    body {
-        @apply bg-background text-foreground;
-    }
-}
+/* Delta floaters on the meter */
+.delta-float { position: absolute; right: 44px; bottom: 46px; font-family: 'Cinzel', serif; font-weight: 700;
+  font-size: 22px; text-shadow: 0 2px 8px #000; pointer-events: none; z-index: 80; }
 
-@layer base {
-    [data-debug-wrapper="true"] {
-        display: contents !important;
-    }
+.loading-court { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: var(--dark); color: var(--gold); font-family: 'Cinzel', serif; letter-spacing: 4px; }
 
-    [data-debug-wrapper="true"] > * {
-        margin-left: inherit;
-        margin-right: inherit;
-        margin-top: inherit;
-        margin-bottom: inherit;
-        padding-left: inherit;
-        padding-right: inherit;
-        padding-top: inherit;
-        padding-bottom: inherit;
-        column-gap: inherit;
-        row-gap: inherit;
-        gap: inherit;
-        border-left-width: inherit;
-        border-right-width: inherit;
-        border-top-width: inherit;
-        border-bottom-width: inherit;
-        border-left-style: inherit;
-        border-right-style: inherit;
-        border-top-style: inherit;
-        border-bottom-style: inherit;
-        border-left-color: inherit;
-        border-right-color: inherit;
-        border-top-color: inherit;
-        border-bottom-color: inherit;
-    }
-}
+@keyframes deltaRise { 0% { opacity: 0; transform: translateY(0) scale(.8); } 20% { opacity: 1; transform: translateY(-8px) scale(1.1); } 100% { opacity: 0; transform: translateY(-38px) scale(1); } }
