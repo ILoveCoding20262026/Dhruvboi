@@ -14,7 +14,6 @@ import TrialScreen from "@/screens/TrialScreen";
 import EndingScreen from "@/screens/EndingScreen";
 
 function GoogleCallback() {
-  const { applyToken } = useAuth();
   const done = useRef(false);
   useEffect(() => {
     if (done.current) return;
@@ -23,13 +22,15 @@ function GoogleCallback() {
     const sid = new URLSearchParams(hash.replace("#", "")).get("session_id");
     (async () => {
       try {
-        const { data } = await api.post("/auth/google/session", { session_id: sid });
-        applyToken(data.token, data.user);
-      } catch { /* fall through to login */ }
-      window.history.replaceState(null, "", window.location.pathname);
-      window.location.hash = "";
+        if (sid) {
+          const { data } = await api.post("/auth/google/session", { session_id: sid });
+          localStorage.setItem("dsc_token", data.token);
+        }
+      } catch { /* fall through to login screen */ }
+      // Hard redirect to a clean URL (no hash) so the app re-mounts and reads the token.
+      window.location.replace(window.location.origin + window.location.pathname);
     })();
-  }, [applyToken]);
+  }, []);
   return <div className="loading-court">ENTERING THE COURT…</div>;
 }
 
