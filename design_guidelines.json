@@ -1,0 +1,174 @@
+{
+  "project_name": "Delhi Sultanate Court Simulator",
+  "theme": "dark",
+  "design_philosophy": "Authentic medieval Delhi Sultanate courtroom aesthetic. High stakes, cinematic, and game-like. Fusion of Archetype 5 (Luxury/Cinematic/Moody) with Archetype 1 (Earthy/Stone). The UI should feel semi-diegetic, floating above the immersive SVG courtroom scene like a high-end RPG or visual novel. No generic SaaS cards.",
+  "typography": {
+    "primary_heading": {
+      "family": "Cormorant Garamond",
+      "weights": ["400", "600", "700"],
+      "usage": "Cinematics, Titles, Sultan/Qazi Dialogue Headers, Suspicion Meter Numbers",
+      "style": "tracking-tight, high-contrast, dramatic serif"
+    },
+    "secondary_ui": {
+      "family": "Outfit",
+      "weights": ["300", "400", "500"],
+      "usage": "Buttons, Chat Log Body, Form Inputs, Stats, Small Labels",
+      "style": "Clean geometric sans for readability in dense game UI"
+    },
+    "rules": [
+      "DO NOT USE Inter, Roboto, or generic sans for headings.",
+      "Sultan dialogue text must use Cormorant Garamond text-xl to text-2xl for authoritative weight.",
+      "Labels over inputs/evidence must be Uppercase + Wide Spacing (tracking-[0.2em])."
+    ]
+  },
+  "colors": {
+    "background": {
+      "obsidian": "#0A0A0A",
+      "deep_slate": "#111827",
+      "midnight": "#020617",
+      "parchment_dark": "#1A1614"
+    },
+    "accents": {
+      "sultan_gold": "#D4AF37",
+      "blood_crimson": "#8B0000",
+      "stone_grey": "#4B5563",
+      "faded_parchment": "#F3E5AB"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "muted": "#9CA3AF",
+      "gold_highlight": "#FBBF24",
+      "danger": "#EF4444"
+    },
+    "suspicion_gradient": {
+      "0": "#10B981", 
+      "50": "#F59E0B",
+      "100": "#991B1B"
+    },
+    "rules": [
+      "Never use pure #000000, tint with midnight blue or warm stone.",
+      "Use Sultan Gold sparingly for primary CTAs and Evidence borders.",
+      "Text on dark overlays must have drop-shadow for APCA contrast compliance."
+    ]
+  },
+  "visual_enhancers": {
+    "surfaces": {
+      "crystal_glass": "bg-black/60 backdrop-blur-xl border-t border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)]",
+      "parchment_card": "bg-[#1A1614]/90 border border-[#D4AF37]/20 shadow-lg",
+      "input_field": "bg-black/40 border-b border-white/20 focus:border-[#D4AF37] transition-colors rounded-none"
+    },
+    "textures": [
+      "Add a subtle grain/noise overlay (`mix-blend-overlay opacity-20`) across the entire screen to kill digital flatness and enhance the cinematic feel.",
+      "Use radial gradients to create vignette effects around the screen edges."
+    ]
+  },
+  "components_styling": {
+    "buttons": {
+      "primary": "bg-transparent border border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black transition-all duration-300 uppercase tracking-widest text-sm py-4 px-8 rounded-none",
+      "ghost": "text-white/70 hover:text-white hover:bg-white/5 transition-all duration-200"
+    },
+    "evidence_card": {
+      "style": "parchment_card, hover:-translate-y-2 hover:border-[#D4AF37]/60 hover:shadow-[0_0_15px_rgba(212,175,55,0.3)] transition-all cursor-pointer group p-4 flex flex-col gap-2 relative overflow-hidden",
+      "image_container": "w-full h-24 overflow-hidden grayscale group-hover:grayscale-0 transition-all duration-500"
+    },
+    "dialogue_log": {
+      "container": "crystal_glass, p-6 overflow-y-auto max-h-[40vh] flex flex-col gap-4 scrollbar-thin scrollbar-thumb-[#D4AF37]/30",
+      "player_bubble": "self-end text-right text-white/90 font-outfit",
+      "sultan_bubble": "self-start text-left text-[#D4AF37] font-cormorant text-xl leading-relaxed border-l-2 border-[#D4AF37]/50 pl-4"
+    },
+    "suspicion_meter": {
+      "container": "w-full h-3 bg-black/80 border border-white/10 relative overflow-visible mt-8",
+      "fill": "h-full transition-all duration-1000 ease-out",
+      "marker": "absolute top-1/2 -translate-y-1/2 w-1 h-8 bg-white shadow-[0_0_10px_white]",
+      "delta_text": "absolute -top-8 font-cormorant text-2xl font-bold drop-shadow-md"
+    }
+  },
+  "spacing_and_grids": {
+    "philosophy": "Cinematic spacing. Wide margins, extreme negative space for title screens, dense precise bento-grids for the trial HUD.",
+    "trial_grid_desktop": "grid grid-cols-12 gap-6 h-screen w-full p-8",
+    "bento_rules": [
+      "Left Col (col-span-3): Dialogue Log + Input",
+      "Center Col (col-span-6): SVG Court Scene (Background) + Cinematic overlay",
+      "Right Col (col-span-3): Evidence Deck + Witness Interrogation Grid"
+    ]
+  },
+  "layouts": {
+    "auth_screen": {
+      "background": "Dark arches night image full screen cover.",
+      "overlay": "bg-black/70",
+      "layout": "Flex center. Form uses 'crystal_glass' surface, minimal inputs. Huge 'Cormorant Garamond' title: 'ENTER THE COURT'."
+    },
+    "cover_title_screen": {
+      "background": "Cinematic SVG or Courtroom image with slow zoom effect.",
+      "layout": "Asymmetric. Massive title 'DELHI SULTANATE' left-aligned text-6xl md:text-[8vw] leading-none text-[#D4AF37]. Navigation links (Continue, New Trial, Multiplayer) stacked below with generous line spacing."
+    },
+    "choose_sultan_screen": {
+      "layout": "Horizontal scrolling carousel or massive grid. Each Sultan is a card showing their 'Difficulty Tier'. Hovering reveals their traits.",
+      "styling": "Cards are dark, borderless until hover. On hover, gold border illuminates."
+    },
+    "trial_screen": {
+      "structure": "Semi-diegetic. The SVG Court is the fixed background layer `z-0`. The UI floats in `z-10` using `crystal_glass` surfaces.",
+      "top_bar": "Suspicion Meter stretches across the top 60% of the screen width, centered. Current % displayed in large serif font.",
+      "bottom_bar": "Player argument text area spanning col-span-6 in the bottom center. 'Present Evidence' button attached to input."
+    },
+    "ending_cinematic": {
+      "background": "Medieval throne shadow image for Condemned, or bright open arch for Freedom.",
+      "layout": "Centered text layout. Typing effect for the final verdict. Massive text scale (text-5xl+)."
+    }
+  },
+  "motion_and_animation": {
+    "libraries": "Framer Motion for UI, GSAP for SVG court scene.",
+    "suspicion_meter": {
+      "bar": "Animate width using framer-motion layout. Color interpolates based on value.",
+      "delta": "When suspicion changes, spawn a floating '+15%' text that animates up (y: -20, opacity: 0) over 1.5s.",
+      "shake": "If delta is > 20% (huge penalty), apply a subtle screen shake to the whole UI container."
+    },
+    "dialogue": {
+      "entrance": "New messages slide up (y: 10) and fade in (opacity: 1) with a spring transition."
+    },
+    "cinematics": {
+      "screen_transitions": "Fade to pure black (bg-[#0A0A0A]) for 1 second between major game states."
+    }
+  },
+  "media": {
+    "images": {
+      "auth_bg": {
+        "url": "https://images.unsplash.com/photo-1597906207670-d8f503c39a43",
+        "description": "Dark night passage with arches. Perfect for Auth or Cover screen."
+      },
+      "condemned_bg": {
+        "url": "https://images.unsplash.com/photo-1637044133420-b4f0f3386c95",
+        "description": "Dark room with medieval chair and light ray. Use for 'Condemned' ending screen."
+      },
+      "evidence_coins": {
+        "url": "https://images.unsplash.com/photo-1755369355222-8146801ccf90",
+        "description": "Stacks of gold coins. Use as thumbnail for the '10,000 Gold Dinars' evidence card."
+      },
+      "parchment_texture": {
+        "url": "https://images.pexels.com/photos/235985/pexels-photo-235985.jpeg",
+        "description": "High-res parchment texture. Use as a background for the Rules screen or letter overlays."
+      }
+    },
+    "icons": "Use @phosphor-icons/react (Duotone or Light weight) for elegant, thin iconography fitting the historical theme."
+  },
+  "accessibility": {
+    "contrast": "Ensure text over glassmorphism has text-shadow or adequate backdrop opacity to meet 4.5:1 ratio.",
+    "testing": "All interactive elements MUST have `data-testid` (e.g., `data-testid=\"argument-submit-btn\"`, `data-testid=\"evidence-card-gold\"`).",
+    "motion": "Respect prefers-reduced-motion for screen shakes and GSAP flashes."
+  },
+  "instructions_to_main_agent": [
+    "Install dependencies: yarn add framer-motion gsap @phosphor-icons/react sonner clsx tailwind-merge",
+    "Setup routing for: /, /auth, /rules, /choose-sultan, /trial, /ending",
+    "Implement the Suspicion Meter as a reusable component that accepts a `value` and `delta` prop, handling its own animation.",
+    "The SVG courtroom background must be separate from the React UI overlays. Put SVG in a fixed div with negative z-index.",
+    "Use custom Shadcn components but STRIP OUT standard styles. Apply the 'crystal_glass' and 'buttons.primary' Tailwind strings provided in these guidelines.",
+    "Create the Auth flow (JWT + Mock Google) using simple, centered inputs with bottom-borders only (no full boxes) for an elegant look."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. Avoid 'AI slop' aesthetic. Create depth with z-index hierarchy and glassmorphism.",
+    "Do NOT apply `transition: all` globally. Target specific properties.",
+    "Do NOT center align the entire app container (.App { text-align: center; }).",
+    "Never use placeholder URLs (via.placeholder.com). Use the provided media URLs.",
+    "Use sonner for toast notifications, configured to look like royal decrees (dark background, gold border)."
+  ]
+}
