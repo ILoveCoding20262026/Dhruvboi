@@ -212,6 +212,87 @@ class TestSaveLoad:
         assert r.json() is None
 
 
+# ═══ AUTH REGRESSION: Google removed ═══
+class TestGoogleRemoved:
+    def test_google_session_endpoint_gone(self):
+        r = requests.post(f"{API}/auth/google/session", json={"session_id": "fake"}, timeout=15)
+        assert r.status_code in (404, 405), f"Google endpoint should be removed, got {r.status_code}"
+
+
+# ═══ WITNESS ENDPOINTS ═══
+class TestWitnessAsk:
+    @pytest.mark.parametrize("wtype", ["clerk", "guard", "merchant"])
+    def test_ask_returns_answer(self, auth_headers, wtype):
+        body = {"diffKey": "medium", "witnessType": wtype,
+                "question": "On the night of the theft did you see anyone else near the treasury and how did they compare to me in height and dress?",
+                "qa": []}
+        r = requests.post(f"{API}/trial/witness/ask", json=body, headers=auth_headers, timeout=90)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert "answer" in d
+        assert d["answer"] and len(d["answer"].strip()) > 10
+
+    def test_ask_empty_rejected(self, auth_headers):
+        r = requests.post(f"{API}/trial/witness/ask",
+                          json={"diffKey": "medium", "witnessType": "guard", "question": "  ", "qa": []},
+                          headers=auth_headers, timeout=30)
+        assert r.status_code == 400
+
+    def test_ask_requires_auth(self):
+        r = requests.post(f"{API}/trial/witness/ask",
+                          json={"diffKey": "medium", "witnessType": "guard", "question": "hi", "qa": []}, timeout=15)
+        assert r.status_code == 401
+
+
+class TestWitnessResolve:
+    def test_resolve_medium_balance_and_shape(self, auth_headers):
+        body = {"diffKey": "medium", "round": 3, "suspicion": 40, "witnessType": "guard",
+                "qa": [{"q": "Did you see anyone else near the treasury?",
+                        "a": "Yes, a hooded figure taller than Farrukh in official robes."}],
+                "history": []}
+        r = requests.post(f"{API}/trial/witness/resolve", json=body, headers=auth_headers, timeout=120)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        for key in ["qaziText", "sultanSpeech", "citizenLine", "mood", "baseDelta", "effDelta",
+                    "prevSuspicion", "newSuspicion", "courtLog", "dramaticEvent",
+                    "testimonySummary", "newEvidence", "ending"]:
+            assert key in d, f"missing key {key}"
+        assert d["prevSuspicion"] == 40
+        # BALANCE: medium is 1.0×/1.0× -> newSuspicion = clamp(round(40 + baseDelta))
+        expected = max(0, min(100, round(40 + d["baseDelta"])))
+        assert d["newSuspicion"] == expected, f"balance broken: baseDelta={d['baseDelta']} expected {expected} got {d['newSuspicion']}"
+        # round 3 is odd -> no new evidence
+        assert d["newEvidence"] is None
+
+    def test_resolve_even_round_grants_evidence(self, auth_headers):
+        body = {"diffKey": "medium", "round": 6, "suspicion": 40, "witnessType": "merchant",
+                "qa": [{"q": "Where was I on the morning of the theft?",
+                        "a": "You were haggling with me for saffron at dawn at my bazaar stall."}],
+                "history": []}
+        r = requests.post(f"{API}/trial/witness/resolve", json=body, headers=auth_headers, timeout=120)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["newEvidence"] is not None, "Round 6 (even) should grant evidence"
+        ev = d["newEvidence"]
+        for k in ["type", "text", "icon", "label"]:
+            assert k in ev and ev[k]
+
+    def test_compute_suspicion_waytooasy_witness_math(self):
+        """Unit-level balance sanity for witness resolve weighting on waytooasy."""
+        import sys
+        sys.path.insert(0, "/app/backend")
+        import sultans as S
+        d = S.SULTAN_META["waytooasy"]
+        # Good interrogation: negative baseDelta -> ×5.0
+        new, eff = S.compute_suspicion(d, -4.0, 40)
+        assert abs(eff - (-20.0)) < 0.001
+        assert new == 20
+        # Bad: positive baseDelta -> ×0.2
+        new, eff = S.compute_suspicion(d, 4.0, 40)
+        assert abs(eff - 0.8) < 0.001
+        assert new == 41
+
+
 # ═══ COMPLETE + STATS ═══
 class TestCompleteStats:
     def test_complete_and_stats(self, auth_headers):

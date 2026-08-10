@@ -20,16 +20,16 @@ Migrate an AI-powered courtroom defense game ("Defend Yourself in the Delhi Sult
 ## Implemented (2026-06)
 - ✅ Full React migration of all screens, SVG court scenes, GSAP intro/ending cinematics, suspicion meter, evidence modal, options modal
 - ✅ FastAPI Claude proxy with robust JSON recovery (S1–S7 strategies) + retries + safe fallback
-- ✅ JWT email/password auth + Emergent Google OAuth (unified Bearer token)
+- ✅ JWT email/password auth (Google login **removed** — kept simple per user request)
 - ✅ Game loop `/api/trial/turn` (Sultan JSON + speech, Qazi, Ulema, Crowd, evidence gen) with exact balance
 - ✅ Auto-save each round + "Continue Trial", match history + win/loss stats
 - ✅ Suspicion delta cue, thinking indicator (interval cleaned up), evidence cards UI
-- ✅ Tested: 16/16 backend, 100% frontend critical flows
+- ✅ **Witness AI & interrogation rounds** — every 3rd round a witness (clerk→guard→merchant) takes the stand; player interrogates (`/api/trial/witness/ask`), Qazi cross-examines and Sultan weighs testimony (`/api/trial/witness/resolve`); mandatory (cannot skip); testimony feeds into history/Sultan context; same balance weighting; evidence still granted on even rounds
+- ✅ Tested: 25/25 backend, 100% frontend (iterations 1–3)
 
 ## Backlog (not yet built)
-- **P1 Witness AI & interrogation rounds** — witnesses on a fixed cadence (every 3rd round), cross-examination
 - **P1 Multiplayer** — WebSocket rooms, 1v1 Duel (human Qazi), Co-op Defense, lobby codes, turn timers
 - **P2** — chat log virtualization for very long trials, streaming (SSE) sultan speech, richer stats/profile page, audio unlock + ambient court murmur
 
 ## Next Tasks
-Witness rounds first (self-contained, high impact), then multiplayer incrementally (WebSocket + lobby → 1v1 → Co-op → timers).
+Multiplayer, built incrementally (WebSocket + lobby → 1v1 → Co-op → timers).

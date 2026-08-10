@@ -1,9 +1,8 @@
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
 import "@/index.css";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { GameProvider, useGame } from "@/game/GameContext";
-import api from "@/game/api";
 
 import AuthScreen from "@/screens/AuthScreen";
 import CoverScreen from "@/screens/CoverScreen";
@@ -12,27 +11,6 @@ import ChooseSultanScreen from "@/screens/ChooseSultanScreen";
 import CinematicScreen from "@/screens/CinematicScreen";
 import TrialScreen from "@/screens/TrialScreen";
 import EndingScreen from "@/screens/EndingScreen";
-
-function GoogleCallback() {
-  const done = useRef(false);
-  useEffect(() => {
-    if (done.current) return;
-    done.current = true;
-    const hash = window.location.hash;
-    const sid = new URLSearchParams(hash.replace("#", "")).get("session_id");
-    (async () => {
-      try {
-        if (sid) {
-          const { data } = await api.post("/auth/google/session", { session_id: sid });
-          localStorage.setItem("dsc_token", data.token);
-        }
-      } catch { /* fall through to login screen */ }
-      // Hard redirect to a clean URL (no hash) so the app re-mounts and reads the token.
-      window.location.replace(window.location.origin + window.location.pathname);
-    })();
-  }, []);
-  return <div className="loading-court">ENTERING THE COURT…</div>;
-}
 
 function GameScreens() {
   const { screen } = useGame();
@@ -49,12 +27,8 @@ function GameScreens() {
 
 function Shell() {
   const { user, loading } = useAuth();
-  const [isCallback] = useState(() => window.location.hash?.includes("session_id="));
-
-  if (isCallback) return <GoogleCallback />;
   if (loading) return <div className="loading-court">◆ ◆ ◆</div>;
   if (!user) return <AuthScreen />;
-
   return (
     <GameProvider>
       <GameScreens />

@@ -22,8 +22,6 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    // Skip /me if returning from Google OAuth callback (handled by AuthCallback)
-    if (window.location.hash?.includes("session_id=")) { setLoading(false); return; }
     checkAuth();
   }, [checkAuth]);
 

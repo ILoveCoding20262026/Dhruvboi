@@ -137,3 +137,98 @@ def compute_suspicion(d, raw_delta, current):
     eff_delta = raw_delta * good_weight if raw_delta < 0 else raw_delta * bad_weight
     new_susp = max(0, min(100, round(current + eff_delta)))
     return new_susp, eff_delta
+
+
+# ═══════════════════════════ WITNESS AI ═══════════════════════════
+# Witnesses take the stand every 3rd round (tunable). Each holds one key exculpatory
+# fact that surfaces only under sharp, specific questioning.
+WITNESS_CADENCE = 3
+WITNESS_ORDER = ["clerk", "guard", "merchant"]
+
+WITNESSES = {
+    "clerk": {
+        "name": "Yusuf the Clerk", "role": "a fellow treasury clerk", "icon": "🖋",
+        "blurb": "Farrukh's colleague at the vault. Nervous, precise, loyal to the truth but afraid of powerful men.",
+        "knowledge": "You have worked beside Farrukh for three years and know him to be meticulous and honest — he once returned a miscounted coin. The head treasurer holds a SECOND vault key that has been unaccounted for a whole month. Days before the theft, Farrukh reported a suspicious well-dressed visitor lingering near the vault to his supervisors, and nothing was done. You are afraid to openly accuse the head treasurer.",
+    },
+    "guard": {
+        "name": "Basir the Guard", "role": "the treasury night guard", "icon": "🛡",
+        "blurb": "Stood watch the night of the theft. Blunt, observant, reluctant to volunteer details unless pressed.",
+        "knowledge": "On the night of the theft you saw a SECOND hooded figure leaving the treasury wing near dawn — taller than Farrukh by a full hand, and wearing the fine robes of a senior official, not a clerk's plain cloth. You did not raise the alarm because senior officials come and go. You did NOT see Farrukh anywhere near the vault that night.",
+    },
+    "merchant": {
+        "name": "Salim the Merchant", "role": "a bazaar spice merchant", "icon": "⚖",
+        "blurb": "Sells saffron near the great mosque. Cheerful, talkative, remembers his customers by their haggling.",
+        "knowledge": "At dawn on the morning of the theft, Farrukh was haggling with you over the price of saffron at your bazaar stall — you remember because he argued shrewdly and left for the morning prayer. This means Farrukh was across the city, not at the vault, when it was opened.",
+    },
+}
+
+
+def witness_for_round(rnd: int) -> str:
+    idx = (rnd // WITNESS_CADENCE - 1) % len(WITNESS_ORDER)
+    return WITNESS_ORDER[idx]
+
+
+def _qa_transcript(qa):
+    if not qa:
+        return "No questions asked yet."
+    return "\n".join([f"Farrukh: \"{x['q']}\"\n{'Witness'}: \"{x['a']}\"" for x in qa])
+
+
+def witness_answer_prompt(d, w, question, qa):
+    prior = _qa_transcript(qa)
+    system = (
+        f"You are {w['name']}, {w['role']} in the Delhi Sultanate under {d['ruler']}, "
+        f"testifying at the trial of Farrukh, a treasury clerk accused of stealing 10,000 gold dinars.\n"
+        f"WHAT YOU KNOW: {w['knowledge']}\n"
+        "You are an honest but nervous, literal witness. Reveal a specific helpful detail ONLY when Farrukh's "
+        "question is sharp, specific and relevant to what you actually know. If his question is vague, leading, "
+        "hostile, or irrelevant, give a short, evasive or unhelpful answer. NEVER invent facts beyond your knowledge. "
+        "Stay fully in character.\n"
+        "Answer in 2–4 sentences. Plain text only — no labels, no quotes around the whole reply."
+    )
+    user = f"Interrogation so far:\n{prior}\n\nFarrukh now asks you: \"{question}\"\nYour answer:"
+    return system, user
+
+
+def witness_resolve_json_prompt(d, rnd, suspicion, w, qa):
+    dg = DELTA_GUIDE.get(d["key"], "Good×1.0 Bad×1.0")
+    system = (
+        f"You are {d['ruler']}, Sultan of Delhi, evaluating how Farrukh interrogated the witness "
+        f"{w['name']} ({w['role']}). Round:{rnd} Suspicion:{suspicion}%.\n"
+        f"TRANSCRIPT:\n{_qa_transcript(qa)}\n\n"
+        "Judge how effectively Farrukh's questioning surfaced exculpatory testimony. Sharp, specific questions "
+        "that drew out genuinely helpful truth should LOWER suspicion (negative baseDelta). Weak, vague, hostile, "
+        "or irrelevant questioning should RAISE suspicion (positive baseDelta). Asking nothing of substance is a "
+        "wasted round and should raise suspicion.\n"
+        f"{dg}\n"
+        "Mood: neutral|pleased|suspicious|angry|amused|thoughtful\n"
+        'Return ONLY JSON: {"mood":"","baseDelta":0,"courtLog":["","",""],"dramaticEvent":"","testimonySummary":""}'
+    )
+    return system, "Deliver your assessment as JSON."
+
+
+def witness_qazi_prompt(d, w, qa):
+    system = (
+        f"You are Qazi Ibrahim, chief prosecutor under {d['ruler']}, reacting to Farrukh's interrogation of the "
+        f"witness {w['name']} ({w['role']}).\n"
+        f"TRANSCRIPT:\n{_qa_transcript(qa)}\n\n"
+        "You have no evidence of your own — you can only attack the reliability of the witness or the weakness of "
+        "Farrukh's questioning. If the testimony helped Farrukh, cast doubt on the witness's memory or motives. If "
+        "the questioning was weak, mock it.\n"
+        "MANDATORY — Write EXACTLY 5 lines. Plain text only, no labels."
+    )
+    return system, "Cross-examine now."
+
+
+def witness_sultan_prompt(d, rnd, suspicion, w, qa, mood, testimony):
+    system = (
+        f"You are {d['ruler']}, Sultan of Delhi. {d['personality']}.\n"
+        f"Your mood: {mood}. Suspicion: {suspicion}%.\n"
+        f"The witness {w['name']} ({w['role']}) has just been interrogated by Farrukh.\n"
+        f"What the testimony established: {testimony or 'little of substance'}.\n"
+        f"TRANSCRIPT:\n{_qa_transcript(qa)}\n\n"
+        "React to this testimony and to how Farrukh conducted the interrogation, in character.\n"
+        "MANDATORY: Write EXACTLY 8 lines addressing the court and Farrukh. Plain text only — no JSON, no labels."
+    )
+    return system, "Speak your reaction to the testimony."

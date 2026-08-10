@@ -3,6 +3,7 @@ import { useGame } from "@/game/GameContext";
 import { useAuth } from "@/context/AuthContext";
 import { DIFFS } from "@/game/gameData";
 import { buildCourtSVG } from "@/game/courtScenes";
+import { isWitnessRound, witnessKeyForRound, WITNESSES } from "@/game/witnesses";
 import api from "@/game/api";
 import Typewriter from "@/components/Typewriter";
 import EvidenceModal from "@/components/EvidenceModal";
@@ -15,7 +16,8 @@ function meterView(pct) {
 }
 
 export default function TrialScreen() {
-  const { game, setGame, messages, isThinking, thinkingStatus, sendTurn, goto, selectDiff, saveGame, resetGame, lastDelta, hasNewEvidence } = useGame();
+  const { game, setGame, messages, isThinking, thinkingStatus, sendTurn, goto, selectDiff, saveGame, resetGame, lastDelta, hasNewEvidence,
+    witnessQA, witnessBusy, askWitness, concludeWitness, resetWitnessQA } = useGame();
   const { logout } = useAuth();
   const [input, setInput] = useState("");
   const [evOpen, setEvOpen] = useState(false);
@@ -23,6 +25,10 @@ export default function TrialScreen() {
   const [optOpen, setOptOpen] = useState(false);
   const [logOn, setLogOn] = useState(true);
   const chatRef = useRef(null);
+  const announcedRound = useRef(0);
+
+  const witnessRound = isWitnessRound(game.round);
+  const witness = witnessRound ? WITNESSES[witnessKeyForRound(game.round)] : null;
 
   const d = game.diffKey ? DIFFS[game.diffKey] : DIFFS.medium;
   const courtSVG = useMemo(() => buildCourtSVG(d, game.mood), [d, game.mood]);
@@ -40,11 +46,26 @@ export default function TrialScreen() {
     return () => window.removeEventListener("keydown", onEsc);
   }, []);
 
+  // Reset the interrogation transcript when entering a new witness round.
+  useEffect(() => {
+    if (witnessRound && announcedRound.current !== game.round) {
+      announcedRound.current = game.round;
+      resetWitnessQA();
+    }
+  }, [witnessRound, game.round, resetWitnessQA]);
+
   const submit = () => {
     const msg = input.trim();
-    if (!msg || isThinking) return;
-    setInput("");
-    sendTurn(msg);
+    if (!msg) return;
+    if (witnessRound) {
+      if (witnessBusy) return;
+      setInput("");
+      askWitness(msg);
+    } else {
+      if (isThinking) return;
+      setInput("");
+      sendTurn(msg);
+    }
   };
 
   const onKey = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } };
@@ -57,6 +78,7 @@ export default function TrialScreen() {
   };
 
   const skipRound = () => {
+    if (witnessRound) return;
     setOptOpen(false);
     setGame({ ...game, round: game.round + 1 });
   };
@@ -65,7 +87,9 @@ export default function TrialScreen() {
     <div id="screen-game" className="screen active" data-testid="trial-screen">
       <div className="game-layout">
         <div className="topbar">
-          <div className="tb-round" data-testid="round-indicator">ROUND {game.round}</div>
+          <div className="tb-round" data-testid="round-indicator">
+            ROUND {game.round}{witnessRound ? " · WITNESS" : ""}
+          </div>
           <div className="tb-ruler">{d.ruler.toUpperCase()}</div>
           <button className="tb-opts" data-testid="options-btn" onClick={() => setOptOpen(true)}>☰ OPTIONS</button>
         </div>
@@ -104,10 +128,34 @@ export default function TrialScreen() {
               )}
             </div>
             <div className="chat-input-row">
-              <input className="chat-input" data-testid="chat-input" value={input} disabled={isThinking}
-                placeholder={isThinking ? "The court deliberates…" : "Speak your defence, Farrukh..."}
-                maxLength={400} onChange={(e) => setInput(e.target.value)} onKeyDown={onKey} />
-              <button className="btn-speak" data-testid="speak-btn" disabled={isThinking} onClick={submit}>SPEAK</button>
+              {witnessRound && (
+                <div className="witness-banner" data-testid="witness-banner">
+                  <div className="witness-banner-icon">{witness.icon}</div>
+                  <div className="witness-banner-text">
+                    <div className="witness-banner-name">{witness.name} <span>· {witness.role}</span></div>
+                    <div className="witness-banner-blurb">{witness.blurb}</div>
+                    <div className="witness-banner-hint">Interrogate the witness — sharp, specific questions surface the truth. You must conclude before the trial continues.</div>
+                  </div>
+                </div>
+              )}
+              <div className="chat-input-controls">
+                <input className="chat-input" data-testid="chat-input" value={input}
+                  disabled={witnessRound ? witnessBusy : isThinking}
+                  placeholder={witnessRound
+                    ? (witnessBusy ? `${witness.name} considers your question…` : `Question the witness, Farrukh...`)
+                    : (isThinking ? "The court deliberates…" : "Speak your defence, Farrukh...")}
+                  maxLength={400} onChange={(e) => setInput(e.target.value)} onKeyDown={onKey} />
+                {witnessRound ? (
+                  <>
+                    <button className="btn-speak" data-testid="ask-witness-btn" disabled={witnessBusy || isThinking} onClick={submit}>ASK</button>
+                    <button className="btn-conclude" data-testid="conclude-witness-btn"
+                      disabled={isThinking || witnessBusy || witnessQA.length === 0}
+                      onClick={concludeWitness}>CONCLUDE →</button>
+                  </>
+                ) : (
+                  <button className="btn-speak" data-testid="speak-btn" disabled={isThinking} onClick={submit}>SPEAK</button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -152,7 +200,9 @@ export default function TrialScreen() {
             <div className="opt-btns">
               <button className="btn-opt" onClick={() => { setOptOpen(false); goto("diff"); }}>⚔ Change Sultan</button>
               <button className="btn-opt" onClick={() => { setOptOpen(false); selectDiff(game.diffKey); }}>↺ Restart Trial</button>
-              <button className="btn-opt" onClick={skipRound}>⏭ Skip Round</button>
+              <button className="btn-opt" data-testid="skip-round-btn" disabled={witnessRound}
+                title={witnessRound ? "Witness rounds cannot be skipped" : ""}
+                onClick={skipRound}>⏭ Skip Round{witnessRound ? " (locked)" : ""}</button>
               <button className="btn-opt danger" data-testid="abandon-btn" onClick={abandon}>✕ Abandon</button>
               <button className="btn-opt primary" data-testid="resume-btn" onClick={() => setOptOpen(false)}>▶ Resume</button>
             </div>

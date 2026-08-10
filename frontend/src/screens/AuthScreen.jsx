@@ -27,12 +27,6 @@ export default function AuthScreen() {
     }
   };
 
-  const googleLogin = () => {
-    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-    const redirectUrl = window.location.origin + "/";
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
-  };
-
   return (
     <div className="auth-screen" data-testid="auth-screen">
       <div className="auth-card">
@@ -63,11 +57,6 @@ export default function AuthScreen() {
             {busy ? "…" : mode === "login" ? "ENTER" : "CREATE ACCOUNT"}
           </button>
         </form>
-
-        <div className="auth-divider"><span>OR</span></div>
-        <button className="auth-google" data-testid="auth-google-btn" onClick={googleLogin}>
-          Continue with Google
-        </button>
 
         <div className="auth-switch">
           {mode === "login" ? "New to the court?" : "Already summoned?"}{" "}

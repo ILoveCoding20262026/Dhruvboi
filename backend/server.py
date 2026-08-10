@@ -15,7 +15,6 @@ load_dotenv(ROOT_DIR / '.env')
 
 import jwt
 import bcrypt
-import httpx
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -65,7 +64,6 @@ async def get_current_user(request: Request) -> dict:
     token = auth[7:] if auth.startswith("Bearer ") else None
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    # Try our JWT first
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
         user = await db.users.find_one({"user_id": payload["sub"]}, {"_id": 0, "password_hash": 0})
@@ -73,18 +71,6 @@ async def get_current_user(request: Request) -> dict:
             return user
     except jwt.PyJWTError:
         pass
-    # Fallback: Emergent Google session token
-    sess = await db.sessions.find_one({"session_token": token}, {"_id": 0})
-    if sess:
-        exp = sess["expires_at"]
-        if isinstance(exp, str):
-            exp = datetime.fromisoformat(exp)
-        if exp.tzinfo is None:
-            exp = exp.replace(tzinfo=timezone.utc)
-        if exp > datetime.now(timezone.utc):
-            user = await db.users.find_one({"user_id": sess["user_id"]}, {"_id": 0, "password_hash": 0})
-            if user:
-                return user
     raise HTTPException(status_code=401, detail="Invalid or expired session")
 
 
@@ -126,40 +112,6 @@ async def login(body: LoginIn):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     token = create_token(user["user_id"], email)
     return {"token": token, "user": public_user(user)}
-
-
-class GoogleSessionIn(BaseModel):
-    session_id: str
-
-
-@api.post("/auth/google/session")
-async def google_session(body: GoogleSessionIn):
-    async with httpx.AsyncClient(timeout=15) as hc:
-        r = await hc.get("https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
-                         headers={"X-Session-ID": body.session_id})
-    if r.status_code != 200:
-        raise HTTPException(status_code=401, detail="Google authentication failed")
-    data = r.json()
-    email = data["email"].lower()
-    user = await db.users.find_one({"email": email})
-    if not user:
-        uid = f"user_{uuid.uuid4().hex[:12]}"
-        await db.users.insert_one({
-            "user_id": uid, "email": email, "name": data.get("name", email.split("@")[0]),
-            "picture": data.get("picture", ""), "provider": "google",
-            "created_at": datetime.now(timezone.utc),
-        })
-    else:
-        uid = user["user_id"]
-    session_token = data["session_token"]
-    await db.sessions.update_one(
-        {"session_token": session_token},
-        {"$set": {"user_id": uid, "session_token": session_token,
-                  "expires_at": datetime.now(timezone.utc) + timedelta(days=7)}},
-        upsert=True,
-    )
-    return {"token": session_token, "user": {"user_id": uid, "email": email,
-                                             "name": data.get("name", email.split("@")[0])}}
 
 
 @api.get("/auth/me")
@@ -380,6 +332,95 @@ async def trial_turn(body: TurnIn, user: dict = Depends(get_current_user)):
     }
 
 
+# ═══════════════════════════ WITNESS ROUNDS ═══════════════════════════
+class QAItem(BaseModel):
+    q: str
+    a: str
+
+
+class WitnessAskIn(BaseModel):
+    diffKey: str
+    witnessType: str
+    question: str
+    qa: List[QAItem] = []
+
+
+@api.post("/trial/witness/ask")
+async def witness_ask(body: WitnessAskIn, user: dict = Depends(get_current_user)):
+    d = S.SULTAN_META.get(body.diffKey) or S.SULTAN_META["medium"]
+    w = S.WITNESSES.get(body.witnessType) or S.WITNESSES["clerk"]
+    q = body.question.strip()
+    if not q:
+        raise HTTPException(status_code=400, detail="Empty question")
+    qa = [x.model_dump() for x in body.qa]
+    sys_p, user_p = S.witness_answer_prompt(d, w, q, qa)
+    answer = await call_claude(sys_p, user_p, 250)
+    if not (answer and answer.strip()):
+        answer = f"{w['name']} shifts uneasily and offers little of substance."
+    return {"answer": answer}
+
+
+class WitnessResolveIn(BaseModel):
+    diffKey: str
+    round: int
+    suspicion: int
+    witnessType: str
+    qa: List[QAItem] = []
+    history: List[HistoryItem] = []
+
+
+@api.post("/trial/witness/resolve")
+async def witness_resolve(body: WitnessResolveIn, user: dict = Depends(get_current_user)):
+    d = S.SULTAN_META.get(body.diffKey) or S.SULTAN_META["medium"]
+    w = S.WITNESSES.get(body.witnessType) or S.WITNESSES["clerk"]
+    qa = [x.model_dump() for x in body.qa]
+
+    json_sys, json_u = S.witness_resolve_json_prompt(d, body.round, body.suspicion, w, qa)
+    qazi_sys, qazi_u = S.witness_qazi_prompt(d, w, qa)
+    json_raw, qazi_text = await asyncio.gather(
+        call_claude(json_sys, json_u, 220),
+        call_claude(qazi_sys, qazi_u, 350),
+    )
+
+    sp = robust_json(json_raw, body.suspicion)
+    testimony = sp.get("testimonySummary") or ""
+    if not isinstance(testimony, str):
+        testimony = ""
+    raw_delta = float(sp.get("baseDelta") or 0)
+    new_susp, eff_delta = S.compute_suspicion(d, raw_delta, body.suspicion)
+
+    speech_sys, speech_u = S.witness_sultan_prompt(d, body.round, body.suspicion, w, qa, sp.get("mood", "neutral"), testimony)
+    sultan_speech = await call_claude(speech_sys, speech_u, 700)
+    if not (sultan_speech and sultan_speech.strip()):
+        sultan_speech = "The Sultan weighs the testimony in silence, his expression unreadable."
+
+    citizen = random.choice(random.choice(S.CROWD))
+    new_ev = generate_evidence(body.round) if body.round % 2 == 0 else None
+
+    ending = None
+    if new_susp <= 0:
+        ending = d["winKey"]
+    elif new_susp >= 100:
+        ending = d["loseKey"]
+
+    return {
+        "witnessName": w["name"],
+        "qaziText": qazi_text or "…",
+        "sultanSpeech": sultan_speech,
+        "citizenLine": citizen,
+        "mood": sp.get("mood", "neutral"),
+        "baseDelta": raw_delta,
+        "effDelta": round(eff_delta, 2),
+        "prevSuspicion": body.suspicion,
+        "newSuspicion": new_susp,
+        "courtLog": sp.get("courtLog", []),
+        "dramaticEvent": sp.get("dramaticEvent", ""),
+        "testimonySummary": testimony,
+        "newEvidence": new_ev,
+        "ending": ending,
+    }
+
+
 # ═══════════════════════════ SAVE / LOAD ═══════════════════════════
 class SaveIn(BaseModel):
     diffKey: str
@@ -463,7 +504,6 @@ async def startup():
     try:
         await db.users.create_index("email", unique=True)
         await db.users.create_index("user_id", unique=True)
-        await db.sessions.create_index("session_token")
         await db.saves.create_index("user_id", unique=True)
     except Exception as e:
         logger.warning(f"index setup: {e}")

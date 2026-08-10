@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useRef, useCallback } from "react";
 import api from "./api";
 import { DIFFS } from "./gameData";
+import { witnessKeyForRound, WITNESSES } from "./witnesses";
 
 const GameContext = createContext(null);
 export const useGame = () => useContext(GameContext);
@@ -27,8 +28,12 @@ export function GameProvider({ children }) {
   const [endingKey, setEndingKey] = useState(null);
   const [lastDelta, setLastDelta] = useState(null);
   const [hasNewEvidence, setHasNewEvidence] = useState(false);
+  const [witnessQA, setWitnessQA] = useState([]);
+  const [witnessBusy, setWitnessBusy] = useState(false);
   const gameRef = useRef(game);
   gameRef.current = game;
+  const witnessQARef = useRef(witnessQA);
+  witnessQARef.current = witnessQA;
 
   const goto = useCallback((s) => setScreen(s), []);
 
@@ -188,10 +193,104 @@ export function GameProvider({ children }) {
     }
   }, [isThinking, addMessage, saveGame]);
 
+  // ─────────────────────── WITNESS ROUNDS ───────────────────────
+  const resetWitnessQA = useCallback(() => setWitnessQA([]), []);
+
+  const askWitness = useCallback(async (question) => {
+    const g = gameRef.current;
+    const q = (question || "").trim();
+    if (!q || witnessBusy) return;
+    const wType = witnessKeyForRound(g.round);
+    addMessage("player", "FARRUKH (YOU)", q, false);
+    setWitnessBusy(true);
+    try {
+      const { data } = await api.post("/trial/witness/ask", {
+        diffKey: g.diffKey, witnessType: wType, question: q, qa: witnessQARef.current,
+      });
+      addMessage("witness", WITNESSES[wType].name.toUpperCase(), data.answer);
+      setWitnessQA((prev) => [...prev, { q, a: data.answer }]);
+    } catch (err) {
+      const detail = err?.response?.data?.detail || err.message;
+      addMessage("system", "", `⚠ The witness hesitates — ${detail}. Ask again.`, false);
+    } finally {
+      setWitnessBusy(false);
+    }
+  }, [witnessBusy, addMessage]);
+
+  const concludeWitness = useCallback(async () => {
+    const g = gameRef.current;
+    const qa = witnessQARef.current;
+    if (isThinking || qa.length === 0) return;
+    const wType = witnessKeyForRound(g.round);
+    startThinking();
+    try {
+      const { data } = await api.post("/trial/witness/resolve", {
+        diffKey: g.diffKey, round: g.round, suspicion: g.suspicion,
+        witnessType: wType, qa, history: g.history,
+      });
+      stopThinking();
+
+      if (data.testimonySummary) {
+        addMessage("system", "", `⚖ TESTIMONY ESTABLISHED — ${data.testimonySummary}`, false);
+        await wait(500);
+      }
+      addMessage("sultan", g.diffKey ? DIFFS[g.diffKey].ruler.toUpperCase() : "THE SULTAN", data.sultanSpeech);
+      await wait(typeDuration(data.sultanSpeech) + 300);
+      addMessage("qazi", "QAZI IBRAHIM", data.qaziText);
+      await wait(typeDuration(data.qaziText) + 200);
+      if (data.newEvidence) {
+        addMessage("system", "", `📜 New evidence secured — open EVIDENCE to read it.`, false);
+        setHasNewEvidence(true);
+        setTimeout(() => setHasNewEvidence(false), 5000);
+        await wait(400);
+      }
+      addMessage("citizen", "THE CROWD", data.citizenLine, false);
+      await wait(300);
+      if (data.dramaticEvent) addMessage("dramatic", "", `— ${data.dramaticEvent} —`, false);
+
+      setLastDelta({ value: data.newSuspicion - data.prevSuspicion, id: ++MSG_ID });
+
+      const newEvidence = data.newEvidence ? [...g.evidence, data.newEvidence] : g.evidence;
+      const testimonyEntry = {
+        round: g.round,
+        player: `[Interrogated ${WITNESSES[wType].name}: ${data.testimonySummary || "no clear testimony surfaced"}]`,
+        sultan: data.sultanSpeech || "", qazi: data.qaziText || "",
+      };
+      const updated = {
+        ...g,
+        suspicion: data.newSuspicion,
+        mood: data.mood || "neutral",
+        history: [...g.history, testimonyEntry],
+        evidence: newEvidence,
+        courtLogs: Array.isArray(data.courtLog) && data.courtLog.length ? data.courtLog : g.courtLogs,
+        round: g.round + 1,
+      };
+      setGame(updated);
+      setWitnessQA([]);
+
+      if (data.ending) {
+        const d = DIFFS[g.diffKey];
+        const result = data.ending === d.winKey ? "win" : "lose";
+        api.post("/trial/complete", {
+          diffKey: g.diffKey, ruler: d.ruler, result,
+          rounds: g.round, finalSuspicion: data.newSuspicion,
+        }).catch(() => {});
+        setTimeout(() => { setEndingKey(data.ending); setScreen("ending"); }, 1600);
+      } else {
+        saveGame(updated);
+      }
+    } catch (err) {
+      stopThinking();
+      const detail = err?.response?.data?.detail || err.message;
+      addMessage("system", "", `⚠ The court scribe stumbles — ${detail}. Conclude again.`, false);
+    }
+  }, [isThinking, addMessage, saveGame]);
+
   return (
     <GameContext.Provider value={{
       screen, goto, game, setGame, messages, isThinking, thinkingStatus,
       endingKey, lastDelta, hasNewEvidence,
+      witnessQA, witnessBusy, askWitness, concludeWitness, resetWitnessQA,
       resetGame, selectDiff, startGame, sendTurn, continueTrial, saveGame,
     }}>
       {children}

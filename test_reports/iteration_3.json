@@ -1,0 +1,28 @@
+{
+  "summary": "Iteration 3 full backend + frontend regression for the new Witness feature and Google OAuth removal. Backend: 25/25 pytest tests pass in 74s (auth, trial turn, evidence presentation, save/load/complete/stats, balance math for medium/waytooasy/impossible, and NEW witness ask/resolve for all 3 witness types + balance + evidence cadence + auth guards + Google endpoint removal). Frontend: full end-to-end witness flow verified via Playwright — login (no Google button), New Solo Trial -> Rules -> Sultan (medium) -> skip cinematic -> trial-screen, play real ROUND 1 and ROUND 2 (Claude LLM), auto-advance to ROUND 3 which correctly enters WITNESS mode (round-indicator shows 'ROUND 3 · WITNESS', witness-banner visible, ASK + CONCLUDE buttons replace speak-btn, chat-input placeholder 'Question the witness…'), conclude-witness-btn correctly disabled until first question, Options -> Skip Round shows 'Skip Round (locked)' and is disabled during witness round, asking a question produces a msg.witness reply in chat-box, conclude then advances to ROUND 4 back to normal SPEAK mode, save/load regression works (continue-trial-btn appears on cover after reload).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_court_backend.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AuthScreen.jsx still contains a dead stub `const googleLogin = () => {}; void googleLogin;` — leftover from Google removal. Harmless but should be deleted for cleanliness.",
+    "/app/memory/test_credentials.md still documents `POST /api/auth/google/session` as an active endpoint even though it has been removed. Update the doc to avoid confusing future agents/users.",
+    "backend server.py still creates the index `db.sessions.create_index('session_token')` at startup even though the sessions collection (Google session tokens) is no longer written to. Safe to remove.",
+    "witness_resolve returns `newEvidence` on even rounds (matches turn semantics), but witness rounds only fall on multiples of WITNESS_CADENCE=3 → the only even witness rounds are 6, 12, 18… That is by design per the spec but worth an inline comment so it isn't misread as a bug.",
+    "In GameContext.jsx `sendTurn` and `concludeWitness` share ~40 lines of near-identical reveal-and-persist logic (sultan speech → qazi → optional evidence → citizen → dramatic → delta → history+save+ending). Consider extracting a shared `revealTurnResult(data)` helper to keep balance rules in one place.",
+    "TrialScreen.jsx uses `resetWitnessQA` inside a useEffect keyed on witnessRound+round; that is fine, but the effect also runs on ANY unrelated re-render because `resetWitnessQA` is referenced in deps and, while it's stable (useCallback), the guard `announcedRound.current !== game.round` is the real gate — a small comment would help future maintainers not rip it out."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_court_backend.py (added TestGoogleRemoved + TestWitnessAsk (3 witness types + empty + auth) + TestWitnessResolve (balance shape, even-round evidence, waytooasy math))"
+  ],
+  "success_rate": {"backend": "100% (25/25)", "frontend": "100% (all witness + auth + save/load checks pass)"},
+  "test_credentials": "farrukh@test.com / vault123 (POST /api/auth/login)",
+  "seed_data_creation": "Test uses existing seeded user farrukh@test.com. Backend pytest also registers ephemeral TEST_ users per run (not cleaned up but harmless).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Witness feature is fully working end-to-end. Cadence: rounds 3, 6, 9… trigger WITNESS mode with witnesses cycling clerk→guard→merchant. During witness rounds: speak-btn is replaced by ask-witness-btn + conclude-witness-btn; conclude is disabled until at least one Q&A; Skip Round is disabled and labelled 'Skip Round (locked)'; testimony summary is appended to history as a synthetic HistoryItem so subsequent /api/trial/turn calls stay coherent. Balance for medium (1.0×/1.0×) is preserved: newSuspicion == clamp(round(prev + baseDelta)). Google OAuth endpoint /api/auth/google/session returns 404 as expected. To reach round 3 in UI you must play 2 real LLM rounds (~15-30s each) so the whole flow takes ~90-120s; wait_for_function on the round-indicator text is the most reliable synchronisation.",
+  "rca of the issue": "No issues found. Suspicion did not move on the witness resolve during the run (22% → 22%) because the LLM returned baseDelta ~= 0 which rounds to 0 delta. This is normal LLM variance, not a bug — the deterministic balance math is separately verified by TestWitnessResolve::test_resolve_medium_balance_and_shape (asserts newSuspicion == clamp(round(prev + baseDelta))) and by TestWitnessResolve::test_compute_suspicion_waytooasy_witness_math (unit-level ×5.0/×0.2 weighting)."
+}

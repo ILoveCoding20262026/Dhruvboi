@@ -35,6 +35,7 @@ export default function RulesScreen() {
             <li><strong style={{ color: "var(--gold)", fontStyle: "normal" }}>Evidence does nothing</strong> until you present it. Mention it explicitly in your argument — the court will examine it that round.</li>
             <li>The Sultan <strong style={{ color: "var(--gold)", fontStyle: "normal" }}>ignores</strong> any evidence you merely claim — you must reference what is actually in your collection.</li>
             <li>Qazi Ibrahim listens to no one but can only use your own words against you.</li>
+            <li>Every <strong style={{ color: "#d8b6ff", fontStyle: "normal" }}>3rd round a witness takes the stand</strong> — a fellow clerk, guard, or merchant. Interrogate them with sharp questions to surface helpful testimony. These rounds <strong style={{ color: "#d8b6ff", fontStyle: "normal" }}>cannot be skipped</strong>, and weak questioning lets the Qazi raise suspicion.</li>
           </ul>
         </div>
 
