@@ -474,13 +474,15 @@ async def complete_trial(body: CompleteIn, user: dict = Depends(get_current_user
 
 @api.get("/stats")
 async def stats(user: dict = Depends(get_current_user)):
-    matches = await db.matches.find({"user_id": user["user_id"]}, {"_id": 0}).sort("played_at", -1).to_list(200)
-    wins = sum(1 for m in matches if m["result"] == "win")
+    uid = user["user_id"]
+    total = await db.matches.count_documents({"user_id": uid})
+    wins = await db.matches.count_documents({"user_id": uid, "result": "win"})
+    history = await db.matches.find({"user_id": uid}, {"_id": 0}).sort("played_at", -1).to_list(20)
     return {
-        "total": len(matches),
+        "total": total,
         "wins": wins,
-        "losses": len(matches) - wins,
-        "history": matches[:20],
+        "losses": total - wins,
+        "history": history,
     }
 
 
