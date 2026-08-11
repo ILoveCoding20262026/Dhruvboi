@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { useAuth } from "@/context/AuthContext";
 import { useGame } from "@/game/GameContext";
 import api from "@/game/api";
 import { toast } from "sonner";
 
 export default function CoverScreen() {
-  const { user, logout } = useAuth();
   const { goto, resetGame, continueTrial } = useGame();
   const [hasSave, setHasSave] = useState(false);
 
@@ -20,10 +18,6 @@ export default function CoverScreen() {
 
   return (
     <div id="screen-cover" className="screen active" style={{ opacity: 1 }} data-testid="cover-screen">
-      <div className="account-chip">
-        <span>{user?.name || user?.email}</span>
-        <button data-testid="logout-btn" onClick={logout}>LEAVE</button>
-      </div>
       <div className="cover-moon">🌙</div>
       <h1 className="cover-title">DEFEND YOURSELF<br />IN THE DELHI<br />SULTANATE</h1>
       <div className="cover-sub">A DELHI SULTANATE TRIAL</div>
@@ -42,10 +36,6 @@ export default function CoverScreen() {
         <button className={`cover-nav-btn ${hasSave ? "" : "primary"}`} data-testid="new-trial-btn"
           onClick={() => { resetGame(); goto("rules"); }}>
           ⚔ NEW SOLO TRIAL
-        </button>
-        <button className="cover-nav-btn disabled" data-testid="multiplayer-btn"
-          onClick={() => toast("Multiplayer arrives in a future decree.")}>
-          👥 MULTIPLAYER — SOON
         </button>
       </div>
 

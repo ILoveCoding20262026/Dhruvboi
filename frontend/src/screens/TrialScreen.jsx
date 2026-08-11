@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useGame } from "@/game/GameContext";
-import { useAuth } from "@/context/AuthContext";
 import { DIFFS } from "@/game/gameData";
 import { buildCourtSVG } from "@/game/courtScenes";
 import { isWitnessRound, witnessKeyForRound, WITNESSES } from "@/game/witnesses";
@@ -18,7 +17,6 @@ function meterView(pct) {
 export default function TrialScreen() {
   const { game, setGame, messages, isThinking, thinkingStatus, sendTurn, goto, selectDiff, saveGame, resetGame, lastDelta, hasNewEvidence,
     witnessQA, witnessBusy, askWitness, concludeWitness, resetWitnessQA } = useGame();
-  const { logout } = useAuth();
   const [input, setInput] = useState("");
   const [evOpen, setEvOpen] = useState(false);
   const [evSel, setEvSel] = useState(null);

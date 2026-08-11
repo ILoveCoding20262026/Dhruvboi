@@ -13,12 +13,10 @@ from dotenv import load_dotenv
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-import jwt
-import bcrypt
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from typing import List, Optional, Any
 
 from emergentintegrations.llm.chat import LlmChat, UserMessage
@@ -41,82 +39,12 @@ app = FastAPI()
 api = APIRouter(prefix="/api")
 
 
-# ═══════════════════════════════ AUTH ═══════════════════════════════
-def hash_password(pw: str) -> str:
-    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
-
-
-def verify_password(pw: str, hashed: str) -> bool:
-    try:
-        return bcrypt.checkpw(pw.encode(), hashed.encode())
-    except Exception:
-        return False
-
-
-def create_token(user_id: str, email: str) -> str:
-    payload = {"sub": user_id, "email": email,
-               "exp": datetime.now(timezone.utc) + timedelta(days=7), "type": "access"}
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
-
-
-async def get_current_user(request: Request) -> dict:
-    auth = request.headers.get("Authorization", "")
-    token = auth[7:] if auth.startswith("Bearer ") else None
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
-        user = await db.users.find_one({"user_id": payload["sub"]}, {"_id": 0, "password_hash": 0})
-        if user:
-            return user
-    except jwt.PyJWTError:
-        pass
-    raise HTTPException(status_code=401, detail="Invalid or expired session")
-
-
-class RegisterIn(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=6)
-    name: str = Field(min_length=1)
-
-
-class LoginIn(BaseModel):
-    email: EmailStr
-    password: str
-
-
-def public_user(u: dict) -> dict:
-    return {"user_id": u["user_id"], "email": u["email"], "name": u.get("name", "")}
-
-
-@api.post("/auth/register")
-async def register(body: RegisterIn):
-    email = body.email.lower()
-    if await db.users.find_one({"email": email}):
-        raise HTTPException(status_code=400, detail="Email already registered")
-    uid = f"user_{uuid.uuid4().hex[:12]}"
-    await db.users.insert_one({
-        "user_id": uid, "email": email, "name": body.name,
-        "password_hash": hash_password(body.password), "provider": "local",
-        "created_at": datetime.now(timezone.utc),
-    })
-    token = create_token(uid, email)
-    return {"token": token, "user": {"user_id": uid, "email": email, "name": body.name}}
-
-
-@api.post("/auth/login")
-async def login(body: LoginIn):
-    email = body.email.lower()
-    user = await db.users.find_one({"email": email})
-    if not user or not verify_password(body.password, user.get("password_hash", "")):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    token = create_token(user["user_id"], email)
-    return {"token": token, "user": public_user(user)}
-
-
-@api.get("/auth/me")
-async def me(user: dict = Depends(get_current_user)):
-    return public_user(user)
+# ═══════════════════════ ANONYMOUS PLAYERS ═══════════════════════
+# No accounts / email required — anyone can play. Saves & stats are keyed to an
+# anonymous per-device guest id sent in the X-Player-Id header.
+async def get_player(request: Request) -> dict:
+    pid = request.headers.get("X-Player-Id") or "anon"
+    return {"user_id": pid}
 
 
 # ═══════════════════════════ CLAUDE PROXY ═══════════════════════════
@@ -265,7 +193,7 @@ class TurnIn(BaseModel):
 
 
 @api.post("/trial/turn")
-async def trial_turn(body: TurnIn, user: dict = Depends(get_current_user)):
+async def trial_turn(body: TurnIn, user: dict = Depends(get_player)):
     d = S.SULTAN_META.get(body.diffKey) or S.SULTAN_META["medium"]
     msg = body.playerMsg.strip()
     if not msg:
@@ -346,7 +274,7 @@ class WitnessAskIn(BaseModel):
 
 
 @api.post("/trial/witness/ask")
-async def witness_ask(body: WitnessAskIn, user: dict = Depends(get_current_user)):
+async def witness_ask(body: WitnessAskIn, user: dict = Depends(get_player)):
     d = S.SULTAN_META.get(body.diffKey) or S.SULTAN_META["medium"]
     w = S.WITNESSES.get(body.witnessType) or S.WITNESSES["clerk"]
     q = body.question.strip()
@@ -370,7 +298,7 @@ class WitnessResolveIn(BaseModel):
 
 
 @api.post("/trial/witness/resolve")
-async def witness_resolve(body: WitnessResolveIn, user: dict = Depends(get_current_user)):
+async def witness_resolve(body: WitnessResolveIn, user: dict = Depends(get_player)):
     d = S.SULTAN_META.get(body.diffKey) or S.SULTAN_META["medium"]
     w = S.WITNESSES.get(body.witnessType) or S.WITNESSES["clerk"]
     qa = [x.model_dump() for x in body.qa]
@@ -434,7 +362,7 @@ class SaveIn(BaseModel):
 
 
 @api.post("/trial/save")
-async def save_trial(body: SaveIn, user: dict = Depends(get_current_user)):
+async def save_trial(body: SaveIn, user: dict = Depends(get_player)):
     doc = body.model_dump()
     doc["user_id"] = user["user_id"]
     doc["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -443,13 +371,13 @@ async def save_trial(body: SaveIn, user: dict = Depends(get_current_user)):
 
 
 @api.get("/trial/current")
-async def current_trial(user: dict = Depends(get_current_user)):
+async def current_trial(user: dict = Depends(get_player)):
     doc = await db.saves.find_one({"user_id": user["user_id"]}, {"_id": 0, "user_id": 0})
     return doc or None
 
 
 @api.delete("/trial/current")
-async def delete_trial(user: dict = Depends(get_current_user)):
+async def delete_trial(user: dict = Depends(get_player)):
     await db.saves.delete_one({"user_id": user["user_id"]})
     return {"ok": True}
 
@@ -463,7 +391,7 @@ class CompleteIn(BaseModel):
 
 
 @api.post("/trial/complete")
-async def complete_trial(body: CompleteIn, user: dict = Depends(get_current_user)):
+async def complete_trial(body: CompleteIn, user: dict = Depends(get_player)):
     await db.matches.insert_one({
         "user_id": user["user_id"], **body.model_dump(),
         "played_at": datetime.now(timezone.utc).isoformat(),
@@ -473,7 +401,7 @@ async def complete_trial(body: CompleteIn, user: dict = Depends(get_current_user
 
 
 @api.get("/stats")
-async def stats(user: dict = Depends(get_current_user)):
+async def stats(user: dict = Depends(get_player)):
     uid = user["user_id"]
     total = await db.matches.count_documents({"user_id": uid})
     wins = await db.matches.count_documents({"user_id": uid, "result": "win"})
@@ -504,9 +432,8 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup():
     try:
-        await db.users.create_index("email", unique=True)
-        await db.users.create_index("user_id", unique=True)
         await db.saves.create_index("user_id", unique=True)
+        await db.matches.create_index("user_id")
     except Exception as e:
         logger.warning(f"index setup: {e}")
 

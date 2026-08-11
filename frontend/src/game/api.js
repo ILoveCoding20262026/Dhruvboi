@@ -3,11 +3,20 @@ import axios from "axios";
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
 
+// Anonymous per-device player id — no email/login required.
+export function getPlayerId() {
+  let id = localStorage.getItem("dsc_player");
+  if (!id) {
+    id = "guest_" + ((crypto?.randomUUID && crypto.randomUUID()) || Math.random().toString(36).slice(2) + Date.now().toString(36));
+    localStorage.setItem("dsc_player", id);
+  }
+  return id;
+}
+
 const api = axios.create({ baseURL: API });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("dsc_token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  config.headers["X-Player-Id"] = getPlayerId();
   return config;
 });
 
