@@ -1,5 +1,5 @@
 // Witness display metadata (must mirror backend sultans.WITNESSES keys). Cadence: every 3rd round.
-export const WITNESS_CADENCE = 3;
+export const WITNESS_CADENCE = 5;
 export const WITNESS_ORDER = ["clerk", "guard", "merchant"];
 
 export const WITNESSES = {

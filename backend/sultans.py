@@ -142,7 +142,7 @@ def compute_suspicion(d, raw_delta, current):
 # ═══════════════════════════ WITNESS AI ═══════════════════════════
 # Witnesses take the stand every 3rd round (tunable). Each holds one key exculpatory
 # fact that surfaces only under sharp, specific questioning.
-WITNESS_CADENCE = 3
+WITNESS_CADENCE = 5
 WITNESS_ORDER = ["clerk", "guard", "merchant"]
 
 WITNESSES = {
